@@ -1,6 +1,3 @@
-Desigur! Iată codul pentru fișierul `README.md`:
-
-```
 # HairClassification Project
 
 ## Overview
