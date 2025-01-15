@@ -1,7 +1,7 @@
 # HairClassification Project
 
 ## Overview
-The HairClassification project is an exciting endeavor focused on classifying different types of hair, such as curly, dreadlocks, kinky, straight, and wavy. This project leverages the power of machine learning and deep learning techniques to achieve accurate classification. The repository includes multiple scripts for essential tasks, such as data processing, model definition, and specialized methods for Convolutional Neural Networks (CNNs). Whether you are a data scientist, machine learning enthusiast, or simply someone interested in image classification, this project provides a comprehensive framework to get started and contribute.
+The HairClassification project is an exciting endeavor focused on classifying different types of hair, such as curly, straight, and wavy. This project leverages the power of machine learning and deep learning techniques to achieve accurate classification. The repository includes multiple scripts for essential tasks, such as data processing, model definition, and specialized methods for Convolutional Neural Networks (CNNs).
 
 ## Prerequisites
 Before you begin, ensure you have met the following requirements:
