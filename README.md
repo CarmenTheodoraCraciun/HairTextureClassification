@@ -5,7 +5,7 @@ The HairClassification project is an exciting endeavor focused on classifying di
 
 ## Prerequisites
 Before you begin, ensure you have met the following requirements:
-- Python 3.x installed
+- Python 3 installed
 - Required libraries: numpy, pandas, sklearn, tensorflow, keras
 
 ## Installation
