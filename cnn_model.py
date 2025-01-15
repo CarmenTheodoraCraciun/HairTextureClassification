@@ -31,7 +31,7 @@ def CNN_model(learning_rate, num_epochs=10, max_batches_per_epoch=20, min_delta=
                 y_batch = y_train[offset:offset + batch_size]
                 yield X_batch, y_batch
 
-    # Example usage: Generate synthetic training data
+    # Generate synthetic training data
     X_train = np.random.rand(200, 224, 224, 3)  # 200 images of size 224x224 with 3 channels
     y_train = np.eye(5)[np.random.randint(0, 5, 200)]  # One-hot encoded labels for 5 classes
     batch_size = 32
