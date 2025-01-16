@@ -1,120 +1,127 @@
+import os
+import cv2
 import numpy as np
-from cnn_methods import convolution, max_pool, flatten, dense, categorical_crossentropy, softmax
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import classification_report, confusion_matrix
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.applications.vgg16 import preprocess_input
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.regularizers import l2
 
-# Define the model
-flat_size = 56 * 56 * 64  # Size after flattening the second pooling layer
+def load_images_and_labels(input_dir, size=(128, 128)):
+    images = []
+    labels = []
+    for category in os.listdir(input_dir):
+        category_dir = os.path.join(input_dir, category)
+        if os.path.isdir(category_dir):
+            for img_name in os.listdir(category_dir):
+                img_path = os.path.join(category_dir, img_name)
+                img = cv2.imread(img_path)
+                if img is not None:
+                    img = cv2.resize(img, size)
+                    images.append(img)
+                    labels.append(category)
+    return np.array(images), np.array(labels)
 
-# Initialize weights with improved initializers
-def he_initialization(shape):
-    return np.random.randn(*shape) * np.sqrt(2. / shape[0])
+input_dir = './processData'
+images, labels = load_images_and_labels(input_dir)
 
-def xavier_initialization(shape):
-    return np.random.randn(*shape) * np.sqrt(1. / shape[0])
+# Split the dataset into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.2, random_state=42)
 
-def CNN_model(learning_rate, num_epochs=10, max_batches_per_epoch=20, min_delta=0.001, tolerance=0.001):
-    W1 = he_initialization((3, 3, 3, 32))
-    b1 = np.zeros(32)
-    W2 = he_initialization((3, 3, 32, 64))
-    b2 = np.zeros(64)
-    W3 = xavier_initialization((flat_size, 128))
-    b3 = np.zeros(128)
-    W4 = xavier_initialization((128, 5))
-    b4 = np.zeros(5)
+# Normalize the images
+X_train_normalized = X_train.astype('float32') / 255.0
+X_test_normalized = X_test.astype('float32') / 255.0
 
-    # Define the training data generator
-    def simple_train_generator(X_train, y_train, batch_size):
-        '''Generate batches of training data.'''
-        num_samples = X_train.shape[0]
-        while True:
-            for offset in range(0, num_samples, batch_size):
-                X_batch = X_train[offset:offset + batch_size]
-                y_batch = y_train[offset:offset + batch_size]
-                yield X_batch, y_batch
+# Convert labels to numerical format
+label_encoder = LabelEncoder()
+y_train_encoded = label_encoder.fit_transform(y_train)
+y_test_encoded = label_encoder.transform(y_test)
 
-    # Generate synthetic training data
-    X_train = np.random.rand(200, 224, 224, 3)  # 200 images of size 224x224 with 3 channels
-    y_train = np.eye(5)[np.random.randint(0, 5, 200)]  # One-hot encoded labels for 5 classes
-    batch_size = 32
-    train_generator = simple_train_generator(X_train, y_train, batch_size)
+# One-hot encode the labels
+y_train_categorical = to_categorical(y_train_encoded)
+y_test_categorical = to_categorical(y_test_encoded)
 
-    # Adam optimizer functions
-    m_W1, v_W1 = np.zeros_like(W1), np.zeros_like(W1)
-    m_b1, v_b1 = np.zeros_like(b1), np.zeros_like(b1)
-    m_W2, v_W2 = np.zeros_like(W2), np.zeros_like(W2)
-    m_b2, v_b2 = np.zeros_like(b2), np.zeros_like(b2)
-    m_W3, v_W3 = np.zeros_like(W3), np.zeros_like(W3)
-    m_b3, v_b3 = np.zeros_like(b3), np.zeros_like(b3)
-    m_W4, v_W4 = np.zeros_like(W4), np.zeros_like(W4)
-    m_b4, v_b4 = np.zeros_like(b4), np.zeros_like(b4)
+# Augmentare date
+datagen = ImageDataGenerator(
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
 
-    def adam_update(W, dW, m, v, t, learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8):
-        m = beta1 * m + (1 - beta1) * dW
-        v = beta2 * v + (1 - beta2) * (dW ** 2)
-        m_hat = m / (1 - beta1 ** t)
-        v_hat = v / (1 - beta2 ** t)
-        W -= learning_rate * m_hat / (np.sqrt(v_hat) + epsilon)
-        return W, m, v
+# Prepare training data
+train_datagen = datagen.flow(X_train_normalized, y_train_categorical, batch_size=32)
+validation_datagen = ImageDataGenerator().flow(X_test_normalized, y_test_categorical, batch_size=32)
 
-    # Training loop
-    t = 0  # Timestep counter for Adam optimizer
-    best_loss = float('inf')
+# Loading the pre-trained VGG16 model (a deep convolutional neural network model trained on the ImageNet dataset)
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
 
-    for epoch in range(num_epochs):
-        print(f"Starting epoch {epoch+1}/{num_epochs}")
-        epoch_loss = 0
-        batch_count = 0
-        for X_batch, y_batch in train_generator:
-            batch_count += 1
-            if batch_count > max_batches_per_epoch:  # Check if max batches per epoch is reached
-                break
-            t += 1
+# Congelează straturile de bază
+for layer in base_model.layers:
+    layer.trainable = False
 
-            print(f"Processing batch {batch_count}")
+# Construiește modelul
+model = Sequential()
+model.add(base_model)
+model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
+model.add(MaxPooling2D((2, 2)))
+model.add(Conv2D(128, (3, 3), activation='relu', padding='same'))
+model.add(MaxPooling2D((2, 2)))
+model.add(Flatten())
+model.add(Dense(256, activation='relu', kernel_regularizer=l2(0.01)))
+model.add(Dropout(0.5))
+model.add(Dense(len(label_encoder.classes_), activation='softmax'))
 
-            # Forward pass
-            print("Convolution")
-            conv1 = convolution(X_batch, W1, b1, stride=1, padding=1)
-            conv1 = np.maximum(0, conv1)
-            print("Max pooling")
-            pool1 = max_pool(conv1, size=2, stride=2)
-            print("Convolution")
-            conv2 = convolution(pool1, W2, b2, stride=1, padding=1)
-            conv2 = np.maximum(0, conv2)
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-            print("Max pooling")
-            pool2 = max_pool(conv2, size=2, stride=2)
-            print("Flatten")
-            flat = flatten(pool2)
-            print("Dense")
-            dense1 = dense(flat, W3, b3, activation='relu')
-            output = dense(dense1, W4, b4, activation='softmax')
+history = model.fit(train_datagen, epochs=20, validation_data=validation_datagen)
 
-            # Calculate loss
-            loss = categorical_crossentropy(y_batch, output)
-            epoch_loss += loss
+# Evaluează modelul
+loss, accuracy = model.evaluate(X_test_normalized, y_test_categorical)
+print(f'Test accuracy: {accuracy:.4f}')
 
-            # Backward pass and weight update with Adam optimizer
-            grad_output = output - y_batch
-            grad_W4 = np.dot(dense1.T, grad_output)
-            grad_b4 = np.sum(grad_output, axis=0)
-            grad_dense1 = np.dot(grad_output, W4.T) * (dense1 > 0)
-            grad_W3 = np.dot(flat.T, grad_dense1)
-            grad_b3 = np.sum(grad_dense1, axis=0)
+# Graficul pentru accuracy și val_accuracy
+accuracy = history.history['accuracy']
+val_accuracy = history.history['val_accuracy']
+epochs = range(1, len(accuracy) + 1)
 
-            W4, m_W4, v_W4 = adam_update(W4, grad_W4, m_W4, v_W4, t)
-            b4, m_b4, v_b4 = adam_update(b4, grad_b4, m_b4, v_b4, t)
-            W3, m_W3, v_W3 = adam_update(W3, grad_W3, m_W3, v_W3, t)
-            b3, m_b3, v_b3 = adam_update(b3, grad_b3, m_b3, v_b3, t)
+plt.figure(figsize=(10, 6))
+plt.plot(epochs, accuracy, 'b', label='Accuracy on training data')
+plt.plot(epochs, val_accuracy, 'r', label='Accuracy on validation data')
+plt.title('Accuracy during training')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
 
-        average_loss = epoch_loss / batch_count
-        print(f"Epoch {epoch+1} completed, average loss: {average_loss}\n")
+# Predictii pentru setul de test
+y_pred_encoded = model.predict(X_test_normalized)
+y_pred = np.argmax(y_pred_encoded, axis=1)
+y_test = np.argmax(y_test_categorical, axis=1)
 
-        # Early stopping check
-        if best_loss - average_loss > min_delta:
-            best_loss = average_loss
-        elif average_loss - best_loss < tolerance:
-            print(f"Stopping early at epoch {epoch+1} due to no significant improvement in loss.")
-            break
+# Calculează precizia, recall și F1-score
+print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
 
-# Running the CNN model
-CNN_model(learning_rate=0.5)
+# Matricea de confuzie
+conf_matrix = confusion_matrix(y_test, y_pred)
+conf_df = pd.DataFrame(conf_matrix, index=label_encoder.classes_, columns=label_encoder.classes_)
+
+# Afișează matricea de confuzie
+plt.figure(figsize=(10, 7))
+sns.heatmap(conf_df, annot=True, cmap="Blues", fmt="d")
+plt.title("Confuzion matrix")
+plt.ylabel("Real classes")
+plt.xlabel("Predicted classes")
+plt.show()

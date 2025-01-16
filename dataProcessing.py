@@ -51,44 +51,7 @@ def resize_image(img, size):
 
     return resized_img
 
-def preprocess_images(input_dir, output_dir, size=(128, 128)):
-    """
-    Resizes images to the specified size and saves them to the output directory.
-
-    Args:
-        input_dir: Directory containing the input images.
-        output_dir: Directory to save the preprocessed images.
-        size: Desired size of the output images (width, height).
-    """
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    print("Start processing data.")
-    for category in os.listdir(input_dir):
-        category_dir = os.path.join(input_dir, category)
-        output_category_dir = os.path.join(output_dir, category)
-        if not os.path.exists(output_category_dir):
-            os.makedirs(output_category_dir)
-
-        if os.path.isdir(category_dir):
-            for img_name in os.listdir(category_dir):
-                img_path = os.path.join(category_dir, img_name)
-
-                if is_image(img_path):
-                    img = cv2.imread(img_path)
-                    if img is not None:
-                        img = resize_image(img, size)
-                        new_img_name = os.path.splitext(img_name)[0] + '.png'
-                        cv2.imwrite(os.path.join(output_category_dir, new_img_name), img)
-                    else:
-                        print(f"Failed to load image: {img_path}")
-                else:
-                    print(f"Not an image: {img_path}")
-    print("The data are processed.")
-
-preprocess_images('./originalData', './processData')
-
-def preprocess_and_augment_image(img, size=(128, 128), shear_range=0.1, zoom_range=0.1, horizontal_flip=True):
+def augment_image(img, size=(128, 128), shear_range=0.1, zoom_range=0.1, horizontal_flip=True):
     """
     Preprocesses and augments an image by applying resizing, shearing, zooming, and horizontal flipping.
 
@@ -127,45 +90,92 @@ def preprocess_and_augment_image(img, size=(128, 128), shear_range=0.1, zoom_ran
 
     return img
 
-def create_validation_set(input_dir, output_dir, split_ratio=0.2):
+def preprocess_images(input_dir, output_dir, size=(128, 128), augment_prob=0.3):
     """
-    Creates a validation dataset by copying a percentage of existing data and applying data augmentation.
+    Resizes images to the specified size and saves them to the output directory.
+    Applies augmentations to a random subset of images.
 
     Args:
         input_dir: Directory containing the input images.
-        output_dir: Directory to save the validation images.
-        split_ratio: Proportion of data to use for validation.
+        output_dir: Directory to save the preprocessed images.
+        size: Desired size of the output images (width, height).
+        augment_prob: Probability of applying augmentation to each image.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    print("Start getting data for validation.")
+    print("Start processing data.")
     for category in os.listdir(input_dir):
         category_dir = os.path.join(input_dir, category)
         output_category_dir = os.path.join(output_dir, category)
         if not os.path.exists(output_category_dir):
             os.makedirs(output_category_dir)
 
+        num_images = 0
         if os.path.isdir(category_dir):
-            images = [f for f in os.listdir(category_dir) if is_image(os.path.join(category_dir, f))]
-            random.shuffle(images)
-
-            split_index = int(len(images) * split_ratio)
-            validation_images = images[:split_index]
-
-            for img_name in validation_images:
+            for idx, img_name in enumerate(os.listdir(category_dir)):
                 img_path = os.path.join(category_dir, img_name)
+
                 if is_image(img_path):
                     img = cv2.imread(img_path)
-                    augmented_img = preprocess_and_augment_image(img, size=(128, 128))
-                    new_img_name = os.path.splitext(img_name)[0] + '_aug.png'
-                    cv2.imwrite(os.path.join(output_category_dir, new_img_name), augmented_img)
+                    if img is not None:
+                        if np.random.rand() < augment_prob:
+                            img = augment_image(img, size=size)
+                        else:
+                            img = resize_image(img, size)
+                        new_img_name = f"{category}_{idx}.png"
+                        cv2.imwrite(os.path.join(output_category_dir, new_img_name), img)
+                        num_images += 1
+                    else:
+                        print(f"Failed to load image: {img_path}")
                 else:
-                    shutil.copy(img_path, os.path.join(output_category_dir, img_name))
+                    print(f"Not an image: {img_path}")
+            
+        print(f"Folder {output_category_dir} has {num_images} images.")
+    
+    print("The data are processed.")
 
-            num_images = len(validation_images)
-            print(f"Folder validationData/{category} has {num_images} images.")
+preprocess_images('./originalData', './processData')
 
-    print("Validation data set created.")
+# def create_validation_set(input_dir, output_dir, split_ratio=0.2):
+    # """
+    # Creates a validation dataset by copying a percentage of existing data and applying data augmentation.
 
-create_validation_set('./processData', './validationData', split_ratio=0.2)
+    # Args:
+    #     input_dir: Directory containing the input images.
+    #     output_dir: Directory to save the validation images.
+    #     split_ratio: Proportion of data to use for validation.
+    # """
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+
+    # print("Start getting data for validation.")
+    # for category in os.listdir(input_dir):
+    #     category_dir = os.path.join(input_dir, category)
+    #     output_category_dir = os.path.join(output_dir, category)
+    #     if not os.path.exists(output_category_dir):
+    #         os.makedirs(output_category_dir)
+
+    #     if os.path.isdir(category_dir):
+    #         images = [f for f in os.listdir(category_dir) if is_image(os.path.join(category_dir, f))]
+    #         random.shuffle(images)
+
+    #         split_index = int(len(images) * split_ratio)
+    #         validation_images = images[:split_index]
+
+    #         for img_name in validation_images:
+    #             img_path = os.path.join(category_dir, img_name)
+    #             if is_image(img_path):
+    #                 img = cv2.imread(img_path)
+    #                 augmented_img = preprocess_and_augment_image(img, size=(128, 128))
+    #                 new_img_name = os.path.splitext(img_name)[0] + '_aug.png'
+    #                 cv2.imwrite(os.path.join(output_category_dir, new_img_name), augmented_img)
+    #             else:
+    #                 shutil.copy(img_path, os.path.join(output_category_dir, img_name))
+
+    #         num_images = len(validation_images)
+    #         print(f"Folder validationData/{category} has {num_images} images.")
+
+    # print("Validation data set created.")
+
+# create_validation_set('./processData', './validationData', split_ratio=0.2)
