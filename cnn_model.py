@@ -65,16 +65,16 @@ datagen = ImageDataGenerator(
 train_datagen = datagen.flow(X_train_normalized, y_train_categorical, batch_size=32)
 validation_datagen = ImageDataGenerator().flow(X_test_normalized, y_test_categorical, batch_size=32)
 
-# Loading the pre-trained VGG16 model (a deep convolutional neural network model trained on the ImageNet dataset)
+# Loading the pre-trained VGG16 model
 base_model = VGG16(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
 
-# Congelează straturile de bază
+# Freeze base layers
 for layer in base_model.layers:
     layer.trainable = False
 
-# Construiește modelul
+# Build the model
 model = Sequential()
-model.add(base_model)
+model.add(base_model) # The VGG16 model
 model.add(Conv2D(64, (3, 3), activation='relu', padding='same'))
 model.add(MaxPooling2D((2, 2)))
 model.add(Conv2D(128, (3, 3), activation='relu', padding='same'))

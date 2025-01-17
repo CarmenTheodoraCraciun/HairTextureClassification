@@ -28,24 +28,30 @@ def resize_image(img, size):
 
     for i in range(new_width):
         for j in range(new_height):
+            #i, j = pixel in the resized image
+            # x, y = pixel in the original image
             x = i * (original_width - 1) / (new_width - 1)
             y = j * (original_height - 1) / (new_height - 1)
 
+            # Neighborhood values
             x0 = int(np.floor(x))
-            x1 = min(x0 + 1, original_width - 1)
+            x1 = min(x0 + 1, original_width - 1) 
             y0 = int(np.floor(y))
             y1 = min(y0 + 1, original_height - 1)
 
-            Ia = img[y0, x0]
-            Ib = img[y0, x1]
-            Ic = img[y1, x0]
-            Id = img[y1, x1]
+            # Extract the intensity values ​​of neighbors
+            Ia = img[y0, x0] # stanga sus
+            Ib = img[y0, x1] # drepata sus
+            Ic = img[y1, x0] # stanga jos
+            Id = img[y1, x1] # dreapta jos
 
+            # Calculates the weight of each neighboring to the final value
             wa = (x1 - x) * (y1 - y)
             wb = (x - x0) * (y1 - y)
             wc = (x1 - x) * (y - y0)
             wd = (x - x0) * (y - y0)
 
+            # The final value of the new pixel
             pixel = wa * Ia + wb * Ib + wc * Ic + wd * Id
             resized_img[j, i] = np.round(pixel).astype(int)
 
@@ -73,12 +79,15 @@ def augment_image(img, size=(128, 128), shear_range=0.1, zoom_range=0.1, horizon
     zoom_factor = np.random.uniform(1 - zoom_range, 1 + zoom_range)
     img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
 
-    if zoom_factor < 1:
+    if zoom_factor < 1: # zoom out
         new_height, new_width = img.shape[:2]
+        # Number of pixels added to padding (black) and its addition
         pad_height = (rows - new_height) // 2
         pad_width = (cols - new_width) // 2
-        img = cv2.copyMakeBorder(img, pad_height, pad_height, pad_width, pad_width, cv2.BORDER_CONSTANT, value=[0, 0, 0])
-    else:
+        img = cv2.copyMakeBorder(img, pad_height, pad_height,
+            pad_width, pad_width, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    else: # zoom in
+        # Position of the starting point for cutting
         start_x = (img.shape[1] - cols) // 2
         start_y = (img.shape[0] - rows) // 2
         img = img[start_y:start_y + rows, start_x:start_x + cols]
